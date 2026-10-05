@@ -115,3 +115,42 @@ def verify_email(token):
             return jsonify({"success": True, "message": "User Verified successfully"})
     except Exception as e:
         return jsonify({"success": False, "message": f"Error: ({str(e)})"})
+
+@auth_bp. route("/login", methods=["POST"])
+def login(request):
+    data = request.get_json()
+    if not data:
+        return jsonify({"success": False, "message": "Data cannot be empty."})
+
+    email = data.get("email")
+    password = data.get("password")
+
+    if not email or not password:
+        return jsonify({"success": False, "message": "Email and Password cannot be empty."}), 400
+    conn = None
+    try:
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                                SELECT id, name, email, password, role, is_verified FROM users WHERE email = %s 
+                            """ (email))
+            user = cursor.fetchone()
+            if not user:
+                return jsonify({"success": False, "message": "invalid email or password!"}), 400
+
+            if not bcrypt.check_password_hash(user["password"], password):
+                return jsonify({"success": False, "message": "Incorrect password!"}), 401
+
+            if not user["is_verified"]:
+                return jsonify({"success": False, "message": "Please verify your email before loggin in."}), 403
+
+            return jsonify({"success": True,
+                            "message": "Login successful.",
+                            "user": {
+                                "id": user["id"],
+                                "name": user["name"],
+                                "email": user["email"],
+                                "role": user["role"]
+                            }}), 200
+    except Exception as e:
+        return jsonify({"success": False, "message": f"Error: {str(e)}"})
