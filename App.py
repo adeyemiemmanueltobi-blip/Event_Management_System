@@ -3,10 +3,11 @@ from email_validation import validate_email, EmailNotValidError
 from configuration.db import get_connection
 from auth.authentication import auth_bp
 from config import config
-from extension import bcrypt
+from extension import bcrypt, jwt
 app = Flask(__name__)
 bcrypt.init_app(app)
 app.register_blueprint(auth_bp, url_prefix="/api/auth")
+jwt.init_app(app)
 
 app.config.from_object(config)
 @app.route("/")

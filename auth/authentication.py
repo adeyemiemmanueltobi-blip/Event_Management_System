@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from email_validator import validate_email, EmailNotValidError
 from email_service import send_verification_email
-from extension import bcrypt
+from extension import bcrypt, jwt
 import secrets
 auth_bp = Blueprint ("auth", __name__)
 from configuration.db import get_connection
@@ -144,8 +144,11 @@ def login(request):
             if not user["is_verified"]:
                 return jsonify({"success": False, "message": "Please verify your email before loggin in."}), 403
 
+            access_token = jwt.create_access_token(identity=user["id"],
+                                                    additional_claims={"role": user["role"]})
             return jsonify({"success": True,
                             "message": "Login successful.",
+                            "access_token": access_token,
                             "user": {
                                 "id": user["id"],
                                 "name": user["name"],
@@ -154,3 +157,50 @@ def login(request):
                             }}), 200
     except Exception as e:
         return jsonify({"success": False, "message": f"Error: {str(e)}"})
+
+
+    @auth_bp.route("/forget-password", methods=["POST"])
+    def forget_password():
+        data = request.get_json()
+        if not data:
+            return jsonify({"success": False, "message": "Data cannot be empty."})
+
+        email = data.get("email")
+        if not email:
+            return jsonify({"success": False, "message": "Email cannot be empty."}), 400
+
+        conn = None
+        try:
+            conn = get_connection()
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                                SELECT id, name FROM users WHERE email = %s
+                            """, (email,))
+                user = cursor.fetchone()
+                if not user:
+                    return jsonify({"success": False, "message": "User not found!"}), 404
+
+                reset_token = secrets.token_urlsafe(32)
+                cursor.execute("""
+                                UPDATE users SET reset_token = %s WHERE id = %s
+                            """, (reset_token, user["id"]))
+                conn.commit()
+
+                reset_link = f"http://"
+                html=f"""
+                    <html›
+                        <body>
+                            <h1>Password Reset Request</h1>
+                            <p>Click below to reset your password.</p>
+                            <a href="(reset_link)">Reset Password</a>
+                        </body>
+                    </htmL>
+                """
+            send_verification_email(email, "Reset Password", html)
+            
+            return jsonify({"success": True, "message": "Password reset link sent to your email."}), 200
+        except Exception as e:
+            return jsonify({"success": False, "message": f"Error: {str(e)}"}), 500
+        finally: 
+            if conn:
+                    conn.close()
