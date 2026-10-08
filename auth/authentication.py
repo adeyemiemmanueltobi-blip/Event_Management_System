@@ -1,3 +1,5 @@
+from xxlimited import new
+
 from flask import Blueprint, request, jsonify
 from email_validator import validate_email, EmailNotValidError
 from email_service import send_verification_email
@@ -204,3 +206,39 @@ def login(request):
         finally: 
             if conn:
                     conn.close()
+
+
+@auth_bp.route("/reset-password/<token>", methods=["POST"])
+def reset_password (token):
+    data = request.get_json()
+    if not data:
+        return jsonify({"success": False, "message": "Data cannot be empty."}), 400
+
+    new_password = data.get ("new_password")
+    if not new_password:
+        return jsonify({"success": False, "message": "New password cannot be empty."}), 400
+    
+    if len(new_password)<6:
+        return jsonify({"success": False, "message": "New password must be at least 6 characters long."}), 400
+    
+    conn = None
+    try:
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                            SELECT id FROM users WHERE reset_token = %s AND expires_at > NOW()
+                        """, (token,))
+            user = cursor.fetchone()
+            if not user:
+                return jsonify({"success": False, "message": "Invalid or expired reset token."}), 400
+            
+            hashed_password = bcrypt.generate_password_hash(new_password).decode("utf-8")
+            cursor.execute("""
+                            UPDATE users SET password = %s, reset_token = NULL, expires_at = NULL WHERE id = %s
+                        """, (hashed_password, user["id"]))
+            return jsonify({"success": True, "message": "Password reset successful."}), 200
+    except Exception as e:
+        return jsonify({""}), 500
+    finally:
+        cursor.close()
+        conn.close()
