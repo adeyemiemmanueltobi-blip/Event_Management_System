@@ -6,56 +6,30 @@ worker_bp = Blueprint("workers", __name__)
 @worker_bp.route("/profile", methods=["POST"])
 @jwt_required()
 def create_worker_profile():
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
 
-    first_name = data.get("first_name")
-    last_name = data.get("last_name")
-    phone = data.get("phone")
+    bio = data.get("bio")
+    experience_years = data.get("Experience_years")
     location = data.get("location")
+    expected_rate = data.get("expected_rate")
 
-    if not first_name:
-        return jsonify({"success": False, "message": "First name is required"}), 400
-    
-    user_id = int(get_jwt_identity())
-    conn = get_connection()
+    if(isinstance(experience_years, bool) or not isinstance(experience_years, int) or not  0 <= experience_years <=255):
+        return jsonify({"success": False, "message": "Experience_years must be an integer between 0 and 255"}), 400
 
+    if expected_rate is not None:
+        try:
+            experience_rate = float(experience_rate)
+        except (ValueError, TypeError):
+            return jsonify({"success": False, "message": "expected rate must be a number"}), 400
+    if expected_rate < 0:
+        return jsonify({"success": False, "message": "expected rate cannot be negative"}), 400
+
+    user_id = (get_jwt_identity())
+
+    conn = None
     try:
+        conn = get_connection()
         with conn.cursor() as cursor:
-            cursor.execute("""
-                            SELECT id, role FROM users WHERE id=%s
-                            """, (user_id,))
-            user = cursor.fetchone()
-            if not user:
-                return jsonify({"success": False, "message": "User not found"}), 404
-            
-            if user["role"] != "WORKER":
-                return jsonify({"success": False, "message": "Only workers can upload profile"})
-            
-            cursor.execute("""
-                            SELECT id FROM worker_profile WHERE user_id=%s
-                            """, (user_id,))
-            existing_profile = cursor.fetchone()
-            if existing_profile:
-                return jsonify({"message": "Worker profile already exists"}), 409
-            
-            cursor.execute("""
-                            INSERT INTO worker_profile (
-                            user_id, 
-                            first_name,  
-                            last_name, 
-                            phone, 
-                            location)
-                            VALUES (%s, %s, %s, %s, %s)
-                            """, (user_id, first_name, last_name, phone, location))
-            worker_id = cursor.lastrowid
-
-        conn.commit()
-        return jsonify({
-            "success": True, 
-            "message": "Worker profile created successfully!", 
-            "worker_id": worker_id}), 201
+            pass
     except Exception as e:
-        return jsonify({"success": False, "message": f"Error {e}"}), 500
-    finally:
-        if conn:
-            conn.close()
+        return jsonify({"success": False, "message": f"something happened: {str(e)}"}), 500
