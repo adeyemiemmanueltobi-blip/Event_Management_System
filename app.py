@@ -8,7 +8,7 @@ from vendors.routes import vendor_bp
 app = Flask(__name__)
 bcrypt.init_app(app)
 app.register_blueprint(auth_bp, url_prefix="/api/auth")
-app.register_blueprint(vendor_bp, url_prefix="api/")
+app.register_blueprint(vendor_bp, url_prefix="/api")
 jwt.init_app(app)
 oauth.init_app(app)
 cors.init_app(app, resources={r"http://localhost:3000/*": {"origins": "*"}})
