@@ -6,7 +6,7 @@ from configuration.db import get_connection
 vendor_bp = Blueprint("vendors", __name__)
 
 @vendor_bp.route("/profile", methods=["POST"])
-@jwt_required
+@jwt_required()
 def create_vendor_profile():
     data = request.get_json()
 

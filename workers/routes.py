@@ -43,8 +43,8 @@ def create_worker_profile():
     return jsonify(result), status
 
 
-@worker_bp("/profile/me", methods=["POST"])
-@jwt_required
+@worker_bp.route("/profile/me", methods=["POST"])
+@jwt_required()
 def worker_profile():
     user_id = int(get_jwt_identity())
     conn = None
@@ -86,7 +86,7 @@ def worker_profile():
     except Exception as e:
         pass
 
-@worker_bp("/profile/me", methods=["PATCH"])
+@worker_bp.route("/profile/me", methods=["PATCH"])
 @jwt_required()
 def update_my_profile():
     data = request.get_json(silent=True) or {}
